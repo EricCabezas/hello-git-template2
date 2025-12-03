@@ -18,8 +18,8 @@
 // ============================================
 // YOUR NAME AND DATE GO HERE (uncomment and edit the line below):
 // 
-// Author: [Your Name Here]
-// Date:   [Today's Date]
+// Author: DJ Weymuth
+// Date:   Dec 2, 2025
 // ============================================
 
 
