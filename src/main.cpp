@@ -73,6 +73,7 @@ void drawBar(int row, int value) {
     display.print(F(" "));
     display.print(value);
 }
+// Add motor object at top:
 Zumo32U4Motors motors;
 // Replace or modify loop() behavior:
 void avoidObstacles() {
@@ -96,7 +97,33 @@ void avoidObstacles() {
         // Clear - drive forward
         motors.setSpeeds(100, 100);
     }
+    
+    
 }
+void checkSurrounded() {
+    // Check if all three sensors detect something
+    bool surrounded = (leftValue >= 300 &&
+                       frontValue >= 300 &&
+                       rightValue >= 300);
+    
+    if (surrounded) {
+        // Flash all LEDs
+        static bool flashState = false;
+        flashState = !flashState;
+
+        ledRed(flashState);
+        ledYellow(flashState);
+        ledGreen(flashState);
+
+        // Warning tone
+        buzzer.playNote(NOTE_A(4), 50, 15);
+        
+        // Display warning
+        display.gotoXY(0, 5);
+        display.print(F("!! SURROUNDED !!"));
+    }
+}
+
 void showNumericMode() {
     display.clear();
     display.setLayout21x8();
@@ -335,15 +362,5 @@ void loop() {
     Serial.println();
     
     delay(50);
-    // Add motor object at top:
 
-// Add countdown in setup() before the button wait:
-display.clear();
-for (int i = 3; i > 0; i--) {
-    display.gotoXY(0, 3);
-    display.print(F("Starting in "));
-    display.print(i);
-    delay(50);
-}
 
-}
