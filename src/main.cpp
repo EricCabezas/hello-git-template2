@@ -35,6 +35,7 @@ Zumo32U4ButtonA buttonA;
 Zumo32U4ButtonB buttonB;
 Zumo32U4ButtonC buttonC;
 Zumo32U4Buzzer buzzer;
+
 // ===== CONFIGURATION =====
 const int DETECTION_THRESHOLD = 1;    // Minimum to count as "detected"
 const int CLOSE_THRESHOLD = 3;        // Considered "close"
@@ -71,6 +72,30 @@ void drawBar(int row, int value) {
     
     display.print(F(" "));
     display.print(value);
+}
+Zumo32U4Motors motors;
+// Replace or modify loop() behavior:
+void avoidObstacles() {
+    if (frontValue >= CLOSE_THRESHOLD) {
+        // Stop!
+        motors.setSpeeds(0, 0);
+        
+        // Turn away from closer side
+        if (leftValue > rightValue) {
+            motors.setSpeeds(100, 0);  // Turn right
+        } else {
+            motors.setSpeeds(0, 100);  // Turn left
+        }
+        delay(200);
+    }
+    else if (frontValue >= DETECTION_THRESHOLD) {
+        // Slow down
+        motors.setSpeeds(20, 20);
+    }
+    else {
+        // Clear - drive forward
+        motors.setSpeeds(100, 100);
+    }
 }
 void showNumericMode() {
     display.clear();
@@ -310,4 +335,15 @@ void loop() {
     Serial.println();
     
     delay(50);
+    // Add motor object at top:
+
+// Add countdown in setup() before the button wait:
+display.clear();
+for (int i = 3; i > 0; i--) {
+    display.gotoXY(0, 3);
+    display.print(F("Starting in "));
+    display.print(i);
+    delay(50);
+}
+
 }
