@@ -46,7 +46,7 @@ const float COUNTS_PER_DEGREE =
 void displayEncoderCounts();
 void driveDistance(float distanceCm);
 void turnDegrees(float degrees);
-
+void driveDistanceAccel(float distanceCm); // New function declaration
 // ===== MAIN PROGRAM =====
 void setup() {
     display.setLayout21x8();
@@ -57,9 +57,8 @@ void setup() {
     display.gotoXY(0, 4);
     display.print(F("Cts/cm: "));
     display.print(COUNTS_PER_CM, 1);
-
     buttonA.waitForButton();
-
+    
     for (int i = 3; i > 0; i--) {
         display.clear();
         display.print(F("Starting: "));
@@ -67,52 +66,27 @@ void setup() {
         delay(1000);
     }
 }
+
 void loop() {
-    display.clear();
-    display.print(F("1: Fwd 30cm"));
-    delay(500);
-    driveDistance(30);
-    delay(500);
+    encoders.getCountsAndResetLeft();
+    encoders.getCountsAndResetRight();
 
     display.clear();
-    display.print(F("2: Turn 90"));
-    delay(500);
-    turnDegrees(90);
-    delay(500);
-
-    display.clear();
-    display.print(F("3: Fwd 20cm"));
-    delay(500);
-    driveDistance(20);
-    delay(500);
-
-    display.clear();
-    display.print(F("4: Turn 180"));
-    delay(500);
-    turnDegrees(180);
-    delay(500);
-
-    display.clear();
-    display.print(F("5: Fwd 20cm"));
-    delay(500);
-    driveDistance(20);
-    delay(500);
-
-    display.clear();
-    display.print(F("COMPLETE!"));
-    display.gotoXY(0, 2);
-    display.print(F("Press A again"));
-
+    display.print(F("Accel Test 50cm"));
+    display.gotoXY(0, 1);
+    display.print(F("Press A to run"));
     buttonA.waitForButton();
-
-    for (int i = 3; i > 0; i--) {
-        display.clear();
-        display.print(F("Starting: "));
-        display.print(i);
-        delay(1000);
-    }
+    
+    driveDistanceAccel(50);   
+    
+    display.clear();
+    display.print(F("Done!"));
+    display.gotoXY(0, 2);
+    display.print(F("Press A again to"));
+    display.gotoXY(0, 3);
+    display.print(F("repeat test."));
+    buttonA.waitForButton();
 }
-
 // ===== HELPER FUNCTIONS =====
 
 void displayEncoderCounts() {
