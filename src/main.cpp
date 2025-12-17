@@ -111,26 +111,6 @@ void loop() {
         display.print(i);
         delay(1000);
     }
-    display.clear();
-    display.print(F("Fwd 40cm"));
-    driveDistance(40);
-    delay(500);
-    
-    display.clear();
-    display.print(F("Back 20cm"));
-    driveDistance(-20);  // How do you go backward?
-    delay(500);
-    
-    display.clear();
-    display.print(F("Fwd 40cm"));
-    driveDistance(40);
-    delay(500);
-    
-    display.clear();
-    display.print(F("Done!"));
-    display.gotoXY(0, 2);
-    display.print(F("Net: 60cm fwd"));
-    while(true) { }
 }
 
 // ===== HELPER FUNCTIONS =====
@@ -185,5 +165,39 @@ void turnDegrees(float degrees) {
         delay(10);
     }
 
+    motors.setSpeeds(0, 0);
+}
+void driveDistanceAccel(float distanceCm) {
+    // Reset encoders to start counting from zero
+    encoders.getCountsAndResetLeft();
+    encoders.getCountsAndResetRight();
+    
+    int targetCounts = abs(distanceCm * COUNTS_PER_CM);
+    
+    int direction = (distanceCm > 0) ? 1 : -1;
+    
+    int currentSpeed = DRIVE_SPEED / 2;
+    motors.setSpeeds(currentSpeed * direction, currentSpeed * direction);
+    
+    bool fullSpeedReached = false;
+    
+    while ((abs(encoders.getCountsLeft()) + abs(encoders.getCountsRight())) / 2 < targetCounts) {
+        
+        int currentCounts = (abs(encoders.getCountsLeft()) + abs(encoders.getCountsRight())) / 2;
+        
+        if (!fullSpeedReached && currentCounts > targetCounts * 0.25) {
+            
+            
+            currentSpeed = DRIVE_SPEED; 
+            
+            motors.setSpeeds(currentSpeed * direction, currentSpeed * direction);
+            
+            // Set flag
+            fullSpeedReached = true; 
+        }
+        
+        delay(10);
+    }
+    
     motors.setSpeeds(0, 0);
 }
