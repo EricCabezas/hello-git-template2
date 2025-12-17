@@ -67,7 +67,6 @@ void setup() {
         delay(1000);
     }
 }
-
 void loop() {
     display.clear();
     display.print(F("1: Fwd 30cm"));
@@ -112,6 +111,26 @@ void loop() {
         display.print(i);
         delay(1000);
     }
+    display.clear();
+    display.print(F("Fwd 40cm"));
+    driveDistance(40);
+    delay(500);
+    
+    display.clear();
+    display.print(F("Back 20cm"));
+    driveDistance(-20);  // How do you go backward?
+    delay(500);
+    
+    display.clear();
+    display.print(F("Fwd 40cm"));
+    driveDistance(40);
+    delay(500);
+    
+    display.clear();
+    display.print(F("Done!"));
+    display.gotoXY(0, 2);
+    display.print(F("Net: 60cm fwd"));
+    while(true) { }
 }
 
 // ===== HELPER FUNCTIONS =====
