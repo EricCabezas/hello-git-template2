@@ -1,16 +1,18 @@
 /*
 =====================================================
-LESSON 5 - Proximity Sensors
+LESSON 5 - Proximity Sensors (Complete)
 =====================================================
 
 PURPOSE:
 Test and understand the three proximity sensors.
-Display readings and detect objects in front and sides.
+Display readings, detect objects, and demonstrate
+basic autonomous obstacle avoidance.
 
 BUTTONS:
 A (Left)   → Show numeric values mode
 B (Center) → Show bar graph mode
 C (Right)  → Show detection alerts mode
+A (Hold)   → Switch to Autonomous Obstacle Avoidance mode (Mode 3)
 
 READINGS:
 Values 0-6 (brightness levels) where:
@@ -20,57 +22,59 @@ Values 0-6 (brightness levels) where:
 - 5-6 = object very close
 
 HARDWARE:
-- Zumo 32U4 proximity sensors, OLED, buttons, buzzer
+- Zumo 32U4 proximity sensors, OLED, buttons, buzzer, motors
 
-AUTHOR: [Your Name]
-DATE:   [Today's Date]
+AUTHOR: [Eric Cabezas]
+DATE:   [12/17/2025]
 =====================================================
 */
 
 #include <Zumo32U4.h>
 
-// YOUR HARDWARE OBJECTS HERE:
-
+// ===== HARDWARE OBJECTS =====
 Zumo32U4OLED display;
 Zumo32U4ProximitySensors proxSensors;
 Zumo32U4ButtonA buttonA;
 Zumo32U4ButtonB buttonB;
 Zumo32U4ButtonC buttonC;
 Zumo32U4Buzzer buzzer;
-Zumo32U4Motors motors;
+Zumo32U4Motors motors; // Integrated here for better organization
+
 // ===== CONFIGURATION =====
-const int DETECTION_THRESHOLD = 1;    // Minimum to count as "detected"
-const int CLOSE_THRESHOLD = 3;        // Considered "close"
+const int DETECTION_THRESHOLD = 3;    // Minimum to count as "detected"
+const int CLOSE_THRESHOLD = 4;        // Considered "close"
 const int VERY_CLOSE_THRESHOLD = 5;   // Considered "very close"
 
-// YOUR GLOBAL VARIABLES HERE:
 // ===== GLOBAL VARIABLES =====
 int leftValue = 0;
 int frontLeftValue = 0;
 int frontRightValue = 0;
 int frontValue = 0;
 int rightValue = 0;
-int displayMode = 0;    // 0 = numeric, 1 = bars, 2 = alerts
 
-// Add these global variables near the top:
-int detectionCount = 0;
-bool wasDetected = false;
+// 0 = numeric, 1 = bars, 2 = alerts, 3 = autonomous avoidance
+int displayMode = 0;    
 
-// YOUR HELPER FUNCTIONS HERE:
+// ===== HELPER FUNCTIONS =====
 
 void readAllSensors() {
     proxSensors.read();
     
+    // Read sensor counts. Note: The Zumo reads the side sensors using the
+    // opposite side's LED (left LED for right sensor and vice versa).
+    // The library functions abstract this for clarity.
     leftValue = proxSensors.countsLeftWithLeftLeds();
     frontLeftValue = proxSensors.countsFrontWithLeftLeds();
     frontRightValue = proxSensors.countsFrontWithRightLeds();
     rightValue = proxSensors.countsRightWithRightLeds();
     
+    // Use the max of the two front sensors for a conservative detection
     frontValue = max(frontLeftValue, frontRightValue);
 }
 
 void drawBar(int row, int value) {
     display.gotoXY(2, row);
+    // Constrain value to the 0-6 range, as defined
     int barLength = constrain(value, 0, 6);
     
     for (int i = 0; i < 6; i++) {
@@ -84,6 +88,37 @@ void drawBar(int row, int value) {
     display.print(F(" "));
     display.print(value);
 }
+
+void avoidObstacles() {
+    if (frontValue >= CLOSE_THRESHOLD) {
+        // --- OBSTACLE IS CLOSE (THRESHOLD >= 5) ---
+        // Stop immediately
+        motors.setSpeeds(0, 0);
+        
+        // Turn away from the closer side
+        if (leftValue > rightValue) {
+            // Left is closer, turn right
+            motors.setSpeeds(100, -100);  // Turn in place right
+        } else {
+            // Right is closer or equal, turn left
+            motors.setSpeeds(-100, 100);  // Turn in place left
+        }
+        delay(200); // Wait briefly during the turn
+        motors.setSpeeds(0, 0); // Stop after turn
+    }
+    else if (frontValue >= DETECTION_THRESHOLD) {
+        // --- OBSTACLE IS DETECTED (THRESHOLD >= 1) ---
+        // Slow down to prevent running into it
+        motors.setSpeeds(100, 100);
+    }
+    else {
+        // --- PATH IS CLEAR ---
+        // Drive forward at cruising speed
+        motors.setSpeeds(150, 150);
+    }
+}
+
+// ===== DISPLAY MODE FUNCTIONS =====
 
 void showNumericMode() {
     display.clear();
@@ -199,6 +234,38 @@ void showAlertMode() {
     display.print(F("A:num B:bar C:alert"));
 }
 
+void showAutonomousMode() {
+    display.clear();
+    display.setLayout21x8();
+    
+    display.gotoXY(0, 0);
+    display.print(F("=== AUTONOMOUS ==="));
+    display.gotoXY(0, 1);
+    display.print(F("Obstacle Avoidance"));
+    
+    // Show current front reading
+    display.gotoXY(0, 3);
+    display.print(F("Front: "));
+    display.print(frontValue);
+    drawBar(3, frontValue);
+    
+    // Show current action
+    display.gotoXY(0, 5);
+    if (frontValue >= CLOSE_THRESHOLD) {
+        display.print(F("Action: EVADING!"));
+    } else if (frontValue >= DETECTION_THRESHOLD) {
+        display.print(F("Action: Slowing..."));
+    } else {
+        display.print(F("Action: Forward"));
+    }
+    
+    display.gotoXY(0, 7);
+    display.print(F("Press A/B/C to stop"));
+
+    // Crucially, run the avoidance logic
+    avoidObstacles();
+}
+
 void updateIndicators() {
     // LED: On if anything detected in front
     if (frontValue >= DETECTION_THRESHOLD) {
@@ -226,131 +293,19 @@ void updateIndicators() {
         lastBeep = millis();
     }
 }
-// Add this function:
-void updateDirectionLEDs() {
-    // Turn all LEDs off first
-    ledRed(0);
-    ledYellow(0);
-    ledGreen(0);
-    
-    // Find which sensor has highest value
-    if (leftValue > frontValue && leftValue > rightValue 
-        && leftValue >= DETECTION_THRESHOLD) {
-        ledRed(1);
-    }
-    else if (frontValue >= leftValue && frontValue >= rightValue 
-             && frontValue >= DETECTION_THRESHOLD) {
-        ledYellow(1);
-    }
-    else if (rightValue > frontValue && rightValue > leftValue 
-             && rightValue >= DETECTION_THRESHOLD) {
-        ledGreen(1);
-    }
-}
 
-void updateProportionalBeep() {
-    static unsigned long lastBeep = 0;
-    
-    if (frontValue >= DETECTION_THRESHOLD) {
-        int beepInterval = 700 - (frontValue * 100);
-        beepInterval = max(beepInterval, 50);
-        
-        if (millis() - lastBeep > beepInterval) {
-            buzzer.playNote(NOTE_C(5), 30, 15);
-            lastBeep = millis();
-        }
-    }
-}
+// ===== MAIN PROGRAM =====
 
-void checkSurrounded() {
-    // Check if all three sensors detect something
-    bool surrounded = (leftValue >= DETECTION_THRESHOLD &&
-                       frontValue >= DETECTION_THRESHOLD &&
-                       rightValue >= DETECTION_THRESHOLD);
-    
-    if (surrounded) {
-        // Flash all LEDs
-        static bool flashState = false;
-        flashState = !flashState;
-        
-        ledRed(flashState);
-        ledYellow(flashState);
-        ledGreen(flashState);
-        
-        // Warning tone
-        buzzer.playNote(NOTE_A(4), 50, 15);
-        
-        // Display warning
-        display.gotoXY(0, 5);
-        display.print(F("!! SURROUNDED !!"));
-    }
-}
-
-void avoidObstacles() {
-    if (frontValue >= CLOSE_THRESHOLD) {
-        // Stop!
-        motors.setSpeeds(0, 0);
-        
-        // Turn away from closer side
-        if (leftValue > rightValue) {
-            motors.setSpeeds(100, -100);  // Turn right
-        } else {
-            motors.setSpeeds(-100, 100);  // Turn left
-        }
-        delay(200);
-    }
-    else if (frontValue >= DETECTION_THRESHOLD) {
-        // Slow down
-        motors.setSpeeds(50, 50);
-    }
-    else {
-        // Clear - drive forward
-        motors.setSpeeds(100, 100);
-    }
-}
-
-void checkSurroundedDebug() {
-    // Debug: Print which sensors are detecting
-    Serial.print(F("L:"));
-    Serial.print(leftValue >= DETECTION_THRESHOLD ? "YES" : "no");
-    Serial.print(F(" F:"));
-    Serial.print(frontValue >= DETECTION_THRESHOLD ? "YES" : "no");
-    Serial.print(F(" R:"));
-    Serial.println(rightValue >= DETECTION_THRESHOLD ? "YES" : "no");
-    
-    bool surrounded = (leftValue >= DETECTION_THRESHOLD &&
-                       frontValue >= DETECTION_THRESHOLD &&
-                       rightValue >= DETECTION_THRESHOLD);
-    
-    if (surrounded) {
-        Serial.println(F(">>> SURROUNDED! <<<"));
-        // ... rest of code
-    }
-}
 void setup() {
     Serial.begin(115200);
     delay(500);
     
-    Serial.println(F(""));
     Serial.println(F("========================================"));
     Serial.println(F("   LESSON 5 - PROXIMITY SENSORS"));
     Serial.println(F("========================================"));
-    Serial.println(F(""));
-    Serial.println(F("CONTROLS:"));
-    Serial.println(F("  A: Numeric value display"));
-    Serial.println(F("  B: Bar graph display"));
-    Serial.println(F("  C: Detection alerts"));
-    Serial.println(F(""));
-    Serial.println(F("VALUES: 0-6 (brightness levels)"));
-    Serial.println(F("  0 = nothing detected"));
-    Serial.println(F("  1-2 = object far"));
-    Serial.println(F("  3-4 = object close"));
-    Serial.println(F("  5-6 = object very close"));
-    Serial.println(F(""));
     
     proxSensors.initThreeSensors();
     Serial.println(F("Proximity sensors initialized."));
-    Serial.println(F("Try moving your hand in front of the robot!"));
     
     display.clear();
     display.setLayout21x8();
@@ -359,106 +314,100 @@ void setup() {
     display.gotoXY(0, 1);
     display.print(F("Proximity Sensors"));
     display.gotoXY(0, 3);
-    display.print(F("Wave hand in front"));
+    display.print(F("Press A/B/C to"));
     display.gotoXY(0, 4);
-    display.print(F("to test sensors"));
-    display.gotoXY(0, 6);
-    display.print(F("Press any button"));
-    display.gotoXY(0, 7);
-    display.print(F("to begin..."));
+    display.print(F("select display mode"));
+    display.gotoXY(0, 5);
+    display.print(F("Hold A for Auto"));
     
-    //button wait or wait for button press
+    // Wait for any button press to exit the welcome screen
     while (!buttonA.getSingleDebouncedPress() &&
            !buttonB.getSingleDebouncedPress() &&
            !buttonC.getSingleDebouncedPress()) {
         delay(10);
     }
     
-    // 3-2-1 countdown (after button press, before loop starts)
-    display.clear();
+    // Check for "Autonomous" mode trigger
+    if (buttonA.isPressed()) {
+        displayMode = 3; // Start in Autonomous mode
+    } else {
+        displayMode = 0; // Start in Numeric mode (default A button mode)
+    }
+
+    // New: Countdown before starting the main loop
+    motors.setSpeeds(0, 0); // Ensure motors are off
     for (int i = 3; i > 0; i--) {
-    display.gotoXY(0, 3);
-    display.print(F("Starting in "));
-    display.print(i);
-    delay(1000);
+        display.clear();
+        display.gotoXY(0, 3);
+        display.print(F("Starting in "));
+        display.print(i);
+        delay(1000);
+    }
 }
-    displayMode = 0;
-}
+
 void loop() {
-    
     readAllSensors();
     
-    // Button handling
-    if (buttonA.getSingleDebouncedPress()) {
-        ledYellow(1); delay(50); ledYellow(0);
-        displayMode = 0;
-        Serial.println(F("[MODE] Numeric"));
-    }
-    if (buttonB.getSingleDebouncedPress()) {
-        ledYellow(1); delay(50); ledYellow(0);
-        displayMode = 1;
-        Serial.println(F("[MODE] Bar graph"));
-    }
-    if (buttonC.getSingleDebouncedPress()) {
-        ledYellow(1); delay(50); ledYellow(0);
-        displayMode = 2;
-        Serial.println(F("[MODE] Alerts"));
+    // Button handling - Only check buttons if not in Autonomous mode
+    // (In autonomous mode, any button press acts as a stop/exit)
+    if (displayMode != 3) {
+        if (buttonA.getSingleDebouncedPress()) {
+            ledYellow(1); delay(50); ledYellow(0);
+            displayMode = 0; // Numeric
+            Serial.println(F("[MODE] Numeric"));
+        }
+        if (buttonB.getSingleDebouncedPress()) {
+            ledYellow(1); delay(50); ledYellow(0);
+            displayMode = 1; // Bar graph
+            Serial.println(F("[MODE] Bar graph"));
+        }
+        if (buttonC.getSingleDebouncedPress()) {
+            ledYellow(1); delay(50); ledYellow(0);
+            displayMode = 2; // Alerts
+            Serial.println(F("[MODE] Alerts"));
+        }
+    } else {
+        // If in Autonomous mode, any press returns to a manual mode and stops motors
+        if (buttonA.getSingleDebouncedPress() || buttonB.getSingleDebouncedPress() || buttonC.getSingleDebouncedPress()) {
+             motors.setSpeeds(0, 0);
+             displayMode = 0; // Exit to Numeric display mode
+             Serial.println(F("[MODE] Autonomous STOPPED"));
+        }
     }
     
-    // Update display
+    // Update display and run logic
     switch (displayMode) {
         case 0: showNumericMode(); break;
         case 1: showBarGraphMode(); break;
         case 2: showAlertMode(); break;
+        case 3: showAutonomousMode(); break; // Run autonomous logic
     }
     
-    // updateIndicators();  // Original - commented out
-    // updateDirectionLEDs();   // New direction-based LEDs
-    //updateProportionalBeep();  // Smooth beeping based on distance
-    checkSurrounded();    // check for surrounded condition
-
-
-    // Serial logging
-    Serial.print(F("L:"));
-    Serial.print(leftValue);
-    Serial.print(F("\tF:"));
-    Serial.print(frontValue);
-    Serial.print(F(" ("));
-    Serial.print(frontLeftValue);
-    Serial.print(F("/"));
-    Serial.print(frontRightValue);
-    Serial.print(F(")\tR:"));
-    Serial.print(rightValue);
+    // Update indicators (LED and Buzzer)
+    updateIndicators();
     
-    if (frontValue >= VERY_CLOSE_THRESHOLD) {
-        Serial.print(F("\t*** VERY CLOSE ***"));
-    } else if (frontValue >= CLOSE_THRESHOLD) {
-        Serial.print(F("\t* CLOSE *"));
-    } else if (frontValue >= DETECTION_THRESHOLD) {
-        Serial.print(F("\t(detected)"));
+    // Serial logging (Skipped if in autonomous mode to prevent overwhelming the serial output)
+    if (displayMode != 3) {
+        Serial.print(F("L:"));
+        Serial.print(leftValue);
+        Serial.print(F("\tF:"));
+        Serial.print(frontValue);
+        Serial.print(F(" ("));
+        Serial.print(frontLeftValue);
+        Serial.print(F("/"));
+        Serial.print(frontRightValue);
+        Serial.print(F(")\tR:"));
+        Serial.print(rightValue);
+        
+        if (frontValue >= VERY_CLOSE_THRESHOLD) {
+            Serial.print(F("\t*** VERY CLOSE ***"));
+        } else if (frontValue >= CLOSE_THRESHOLD) {
+            Serial.print(F("\t* CLOSE *"));
+        } else if (frontValue >= DETECTION_THRESHOLD) {
+            Serial.print(F("\t(detected)"));
+        }
+        Serial.println();
     }
-    Serial.println();
     
-    delay(50);
-
-// Add this in loop(), after readAllSensors():
-// Edge detection - only count NEW detections
-if (frontValue >= DETECTION_THRESHOLD && !wasDetected) {
-    detectionCount++;
-    wasDetected = true;
+    delay(50); // General delay for sensor polling/display update speed
 }
-
-if (frontValue < DETECTION_THRESHOLD) {
-    wasDetected = false;
-}
-
-// Reset on button press (add this in loop())
-if (buttonA.getSingleDebouncedPress()) {
-    detectionCount = 0;
-}
-
-avoidObstacles();  // Actually run the obstacle avoidance!
-
-//checkSurroundedDebug(); //send data to the serial port for debugging
-}
-
